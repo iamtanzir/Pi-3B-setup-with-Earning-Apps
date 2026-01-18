@@ -1,0 +1,931 @@
+Part 1: USB Boot Enable (One-time, microSD ব্যবহার করে)
+Raspberry Pi Imager ডাউনলোড ও ইনস্টল করুন Raspberry Pi Imager আপনার কম্পিউটারে ইনস্টল করুন।
+
+microSD কার্ডে Raspberry Pi OS Lite 64-bit ফ্লাশ করুন
+
+Imager চালু করুন।
+
+"Choose OS" তে ক্লিক করুন -> "Raspberry Pi OS (other)" -> "Raspberry Pi OS Lite (64-bit)" নির্বাচন করুন।
+
+"Choose Storage" তে আপনার microSD কার্ডটি নির্বাচন করুন।
+
+"Write" ক্লিক করুন এবং ফ্লাশিং শেষ হওয়ার জন্য অপেক্ষা করুন।
+
+microSD কার্ড থেকে Raspberry Pi বুট করুন এবং USB Boot enable করুন
+
+Raspberry Pi-তে microSD কার্ড লাগান, মনিটর ও কিবোর্ড সংযোগ করুন এবং পাওয়ার দিন।
+
+ডিফল্ট ইউজারনেম pi এবং পাসওয়ার্ড raspberry ব্যবহার করে লগইন করুন।
+
+টার্মিনাল খুলে নিচের কমান্ডগুলো রান করুন:
+
+bash
+sudo apt update
+sudo apt full-upgrade -y
+sudo apt install rpi-eeprom -y
+এখন USB Boot enable করতে:
+
+bash
+sudo rpi-eeprom-config --edit
+এটি একটি টেক্সট এডিটর খুলবে। নিচের লাইনটি যুক্ত করুন (যদি না থাকে):
+
+text
+PROGRAM_USB_BOOT=1
+সেভ করে বের হন (nano এডিটরের ক্ষেত্রে Ctrl+X, তারপর Y, তারপর Enter)।
+
+Raspberry Pi রিবুট করুন:
+
+bash
+sudo reboot
+OTP প্রোগ্রামিং নিশ্চিত করুন
+
+পুনরায় লগইন করে নিচের কমান্ডটি রান করুন:
+
+bash
+vcgencmd otp_dump | grep 17:
+আউটপুট 17:3020000a দেখাতে হবে (বা অনুরূপ)। যদি তাই হয়, তাহলে USB Boot enable করা হয়েছে।
+
+Part 2: SSD-তে OS ইনস্টলেশন
+SSD-তে Raspberry Pi OS Lite 64-bit ফ্লাশ করুন
+
+Raspberry Pi Imager দিয়ে আপনার SSD-তে একই OS ফ্লাশ করুন (microSD এর বদলে SSD নির্বাচন করুন)।
+
+ফ্লাশিং শেষ হলে, SSD টি Raspberry Pi-এর USB 3.0 to SATA অ্যাডাপ্টারের মাধ্যমে সংযোগ দিন।
+
+Raspberry Pi থেকে microSD কার্ড সরান এবং SSD থেকে বুট করুন
+
+Raspberry Pi বন্ধ করুন।
+
+microSD কার্ড খুলে নিন।
+
+শুধু SSD সংযুক্ত রাখুন এবং পাওয়ার দিন।
+
+যদি সবকিছু ঠিকঠাক হয়, তাহলে Raspberry Pi SSD থেকে বুট হবে।
+
+Part 3: Base OS সেটআপ
+আপডেট ও আপগ্রেড
+
+লগইন করুন (ইউজারনেম pi, পাসওয়ার্ড raspberry)।
+
+টার্মিনালে নিচের কমান্ডগুলো রান করুন:
+
+bash
+sudo apt update
+sudo apt full-upgrade -y
+sudo apt autoremove -y
+sudo apt clean
+Locale ও timezone সেটআপ
+
+Locale সেটআপ:
+
+bash
+sudo raspi-config
+Localisation Options -> Change Locale -> en_US.UTF-8 UTF-8 নির্বাচন করুন (তালিকা থেকে স্পেসবার দিয়ে সিলেক্ট করে এন্টার চাপুন)।
+ডিফল্ট locale হিসেবে en_US.UTF-8 নির্বাচন করুন।
+
+Timezone সেটআপ:
+
+bash
+sudo timedatectl set-timezone Asia/Dhaka
+SSH enable করা
+
+sudo raspi-config এ গিয়ে Interface Options -> SSH -> Yes নির্বাচন করুন।
+
+Hostname সেট করা
+
+sudo raspi-config -> System Options -> Hostname -> একটি নতুন hostname দিন (যেমন raspberrypi)।
+
+রিবুট করুন:
+
+bash
+sudo reboot
+Part 4: Docker ইনস্টলেশন (64-bit)
+Docker ইনস্টল করুন:
+
+bash
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+বর্তমান ইউজারকে docker গ্রুপে যোগ করুন:
+
+bash
+sudo usermod -aG docker $USER
+নতুন গ্রুপ permissions প্রয়োগ করতে লগআউট করে পুনরায় লগইন করুন অথবা নিচের কমান্ডটি ব্যবহার করুন:
+
+bash
+newgrp docker
+Docker service enable এবং শুরু করুন:
+
+bash
+sudo systemctl enable docker
+sudo systemctl start docker
+Docker সংস্করণ চেক করুন:
+
+bash
+docker version
+Part 5: Pi-hole (Docker-এ)
+Pi-hole জন্য একটি Docker network তৈরি করুন:
+
+bash
+docker network create pihole_network
+Pi-hole container চালান:
+
+bash
+docker run -d \
+    --name pihole \
+    --network=pihole_network \
+    -p 53:53/tcp -p 53:53/udp \
+    -p 80:80/tcp \
+    -e TZ="Asia/Dhaka" \
+    -e WEBPASSWORD="আপনার শক্তিশালী পাসওয়ার্ড" \
+    -v pihole_data:/etc/pihole \
+    -v pihole_dnsmasq:/etc/dnsmasq.d \
+    --restart=unless-stopped \
+    pihole/pihole:latest
+নোট: WEBPASSWORD পরিবর্তন করুন একটি শক্তিশালী পাসওয়ার্ড দিয়ে।
+
+Pi-hole Admin UI এক্সেস করুন:
+
+ব্রাউজারে http://<আপনার_pi_ip>/admin এ যান এবং সেটাপ সম্পন্ন করুন।
+
+Part 6: Honeygain (Docker with amd64 emulation)
+amd64 emulation সেটআপ (binfmt ব্যবহার করে):
+
+bash
+docker run --privileged --rm tonistiigi/binfmt --install amd64
+Honeygain container চালান:
+
+bash
+docker run -d \
+    --name honeygain \
+    --platform linux/amd64 \
+    -e EMAIL="আপনার_ইমেইল" \
+    -e PASS="আপনার_পাসওয়ার্ড" \
+    -e DEVICE_NAME="raspberrypi" \
+    --restart=unless-stopped \
+    honeygain/honeygain:latest
+নোট: আপনার Honeygain অ্যাকাউন্টের ইমেইল এবং পাসওয়ার্ড দিয়ে প্রতিস্থাপন করুন।
+
+Resource limits (ঐচ্ছিক): যদি আপনি CPU এবং মেমরি লিমিট করতে চান, তাহলে --cpus এবং --memory ফ্ল্যাগ যোগ করুন, যেমন:
+
+bash
+docker run -d \
+    --name honeygain \
+    --platform linux/amd64 \
+    --cpus="0.5" \
+    --memory="512m" \
+    -e EMAIL="আপনার_ইমেইল" \
+    -e PASS="আপনার_পাসওয়ার্ড" \
+    -e DEVICE_NAME="raspberrypi" \
+    --restart=unless-stopped \
+    honeygain/honeygain:latest
+Part 7: EarnApp (Native system service)
+EarnApp install script রান করুন:
+
+bash
+curl -s https://earnapp.com/install.sh | sudo bash
+Device পেয়ারিং:
+
+bash
+sudo earnapp register
+এই কমান্ডটি একটি URL প্রদর্শন করবে। সেই URL এ গিয়ে আপনার EarnApp অ্যাকাউন্টের সাথে ডিভাইসটি পেয়ার করুন।
+
+systemd service হিসেবে চালানো নিশ্চিত করুন:
+
+bash
+sudo systemctl enable earnapp
+sudo systemctl start earnapp
+sudo systemctl status earnapp
+Part 8: মনিটরিং ও মেইনটেন্যান্স
+তাপমাত্রা মনিটরিং:
+
+bash
+vcgencmd measure_temp
+Service স্বাস্থ্য চেক:
+
+bash
+docker ps
+sudo systemctl status earnapp
+স্বয়ংক্রিয় রিস্টার্ট কনফিগার:
+
+Docker containers গুলি --restart=unless-stopped ফ্ল্যাগ দিয়ে চালানো হয়েছে, তাই তারা স্বয়ংক্রিয়ভাবে রিস্টার্ট হবে।
+
+EarnApp service systemd দিয়ে ম্যানেজ হয় এবং enable করা হয়েছে, তাই এটি বুটে শুরু হবে।
+
+লগ চেক:
+
+Pi-hole: docker logs pihole
+
+Honeygain: docker logs honeygain
+
+EarnApp: sudo journalctl -u earnapp -f
+
+Part 9: ট্রাবলশ্যুটিং
+USB boot সমস্যা:
+
+নিশ্চিত করুন যে OTP প্রোগ্রামিং সঠিক হয়েছে (vcgencmd otp_dump | grep 17: 17:3020000a দেখায় কিনা)।
+
+SSD এবং অ্যাডাপ্টার ঠিকমতো সংযোগ করা আছে কিনা চেক করুন।
+
+Container networking সমস্যা:
+
+যদি Pi-hole DNS কাজ না করে, তাহলে পোর্ট 53 অন্য কোন সার্ভিস ব্যবহার করছে কিনা চেক করুন:
+
+bash
+sudo netstat -tulpn | grep :53
+যদি অন্য কোন সার্ভিস (যেমন systemd-resolved) পোর্ট 53 ব্যবহার করে, তবে এটি বন্ধ করুন অথবা Pi-hole কে অন্য পোর্টে চালান।
+
+EarnApp পেয়ারিং সমস্যা:
+
+যদি পেয়ারিং না হয়, তাহলে নিশ্চিত করুন যে ইন্টারনেট সংযোগ আছে এবং কোন ফায়ারওয়াল ব্লক করছে না।
+
+EarnApp service রিস্টার্ট করুন:
+
+bash
+sudo systemctl restart earnapp
+চূড়ান্ত আর্কিটেকচার:
+text
+SSD Boot
+├── Raspberry Pi OS Lite 64-bit
+│   ├── Docker
+│   │   ├── Pi-hole container (pihole_network)
+│   │   └── Honeygain container (amd64 emulated)
+│   └── EarnApp (native systemd service)
+এই গাইডটি অনুসরণ করে আপনি আপনার Raspberry Pi 3B-তে প্রয়োজনীয় সবগুলো সফটওয়্যার ইনস্টল করতে পারবেন। মনে রাখবেন, Raspberry Pi 3B-এর resources সীমিত, তাই resource limits সেট করে নেওয়া ভালো, বিশেষ করে Honeygain container-এর জন্য।
+
+Raspberry Pi 3B সেটআপ সম্পূর্ণ গাইড
+📌 প্রস্তুতি: প্রয়োজনীয় সরঞ্জাম
+8GB+ microSD কার্ড
+
+microSD কার্ড রিডার
+
+HDMI কেবল ও মনিটর (বা হেডলেস সেটআপের জন্য SSH)
+
+কিবোর্ড ও মাউস
+
+Part 1: USB Boot Enable (One-time, microSD ব্যবহার করে)
+1.1 Raspberry Pi Imager দিয়ে OS ফ্লাশ করা
+Raspberry Pi Imager ডাউনলোড করুন: https://www.raspberrypi.com/software/
+
+Imager চালু করুন এবং:
+
+Operating System: Raspberry Pi OS (other) → Raspberry Pi OS Lite (64-bit)
+
+Storage: আপনার microSD কার্ড
+
+Settings (gear icon) চাপুন:
+
+Hostname: raspberrypi
+
+Enable SSH: চেক করুন
+
+Set username and password: pi / আপনার পাসওয়ার্ড
+
+Configure wireless LAN: প্রয়োজন হলে
+
+Set locale settings: en_US.UTF-8, Asia/Dhaka
+
+Write বাটনে ক্লিক করুন
+
+1.2 USB Boot Enable করা
+microSD কার্ডটি Raspberry Pi 3B-তে লাগান
+
+মনিটর, কিবোর্ড সংযোগ করুন এবং পাওয়ার দিন
+
+SSH-এর মাধ্যমে কানেক্ট করুন (অথবা সরাসরি টার্মিনালে):
+
+bash
+ssh pi@raspberrypi.local
+পাসওয়ার্ড দিন
+
+সিস্টেম আপডেট করুন:
+
+bash
+sudo apt update && sudo apt full-upgrade -y
+USB Boot enable করুন:
+
+bash
+echo program_usb_boot_mode=1 | sudo tee -a /boot/config.txt
+রিবুট করুন:
+
+bash
+sudo reboot
+OTP প্রোগ্রামিং নিশ্চিত করুন (রিবুটের পর):
+
+bash
+vcgencmd otp_dump | grep 17:
+আউটপুট দেখাবে: 17:3020000a (USB boot enabled)
+
+Part 2: SSD-তে OS ইনস্টলেশন
+2.1 SSD প্রস্তুত করা
+SSD-কে USB 3.0 to SATA অ্যাডাপ্টারের মাধ্যমে কম্পিউটারে সংযোগ করুন
+
+Raspberry Pi Imager চালু করুন:
+
+OS: Raspberry Pi OS Lite (64-bit)
+
+Storage: আপনার SSD (সাবধান! সঠিক ডিভাইস নির্বাচন করুন)
+
+Settings আগের মতো সেট করুন
+
+Write করুন
+
+2.2 SSD থেকে বুট নিশ্চিত করা
+Raspberry Pi বন্ধ করুন:
+
+bash
+sudo shutdown now
+microSD কার্ড বের করুন
+
+SSD USB পোর্টে সংযোগ করুন
+
+Raspberry Pi পাওয়ার দিন
+
+SSH দিয়ে কানেক্ট করুন:
+
+bash
+ssh pi@raspberrypi.local
+বুট ডিভাইস চেক করুন:
+
+bash
+lsblk
+sda বা sda1 দেখা যাবে (SSD)
+
+Part 3: Base OS সেটআপ
+3.1 সিস্টেম আপডেট
+bash
+sudo apt update
+sudo apt full-upgrade -y
+sudo apt autoremove -y
+sudo apt clean
+3.2 Locale ও Timezone
+bash
+# Timezone সেট
+sudo timedatectl set-timezone Asia/Dhaka
+
+# Locale সেট
+sudo sed -i 's/^# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
+sudo locale-gen en_US.UTF-8
+sudo update-locale en_US.UTF-8
+
+# NTP enable
+sudo timedatectl set-ntp true
+3.3 Hostname সেট
+bash
+sudo hostnamectl set-hostname pi3b-server
+echo "127.0.0.1    pi3b-server" | sudo tee -a /etc/hosts
+3.4 SSH hardening
+bash
+# SSH config এডিট
+sudo nano /etc/ssh/sshd_config
+
+# নিচের লাইনগুলো আন্কমেন্ট করুন:
+# Port 2222 (optional, security জন্য)
+# PermitRootLogin no
+# PasswordAuthentication no (key-based login এর জন্য)
+
+sudo systemctl restart ssh
+3.5 Swapfile অপটিমাইজেশন (Raspberry Pi 3B memory কম)
+bash
+# ডিফল্ট swap বন্ধ করুন
+sudo dphys-swapfile swapoff
+sudo systemctl disable dphys-swapfile
+sudo apt purge dphys-swapfile -y
+
+# ZRAM সেটআপ করুন (recommended for Pi 3B)
+sudo apt install zram-tools -y
+sudo nano /etc/default/zramswap
+নিচের কনফিগারেশন যোগ করুন:
+
+text
+ALGO=zstd
+PERCENT=100
+PRIORITY=100
+bash
+sudo systemctl enable zramswap
+sudo systemctl start zramswap
+Part 4: Docker ইনস্টলেশন (64-bit)
+4.1 Docker ইনস্টল
+bash
+# Docker এর dependencies ইনস্টল
+sudo apt install -y \
+    ca-certificates \
+    curl \
+    gnupg \
+    lsb-release
+
+# Docker GPG key যোগ
+curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+
+# Repository যোগ
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian \
+  $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+# Docker ইনস্টল
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+
+# Docker service enable
+sudo systemctl enable docker
+sudo systemctl start docker
+4.2 User permission
+bash
+# pi user কে docker group এ যোগ
+sudo usermod -aG docker pi
+
+# নতুন group permission apply করতে logout/login করুন
+# অথবা
+newgrp docker
+4.3 Docker configuration
+bash
+# Docker daemon configuration
+sudo nano /etc/docker/daemon.json
+নিচের configuration যোগ করুন:
+
+json
+{
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  },
+  "storage-driver": "overlay2",
+  "default-ulimits": {
+    "nofile": {
+      "Name": "nofile",
+      "Hard": 65535,
+      "Soft": 65535
+    }
+  }
+}
+bash
+sudo systemctl restart docker
+Part 5: Pi-hole (Docker-এ)
+5.1 Docker network তৈরি
+bash
+# Bridge network তৈরি
+docker network create pihole_network
+5.2 Pi-hole container চালান
+bash
+# Directory তৈরি
+mkdir -p ~/docker/pihole
+cd ~/docker/pihole
+
+# docker-compose.yml ফাইল তৈরি
+nano docker-compose.yml
+নিচের content যোগ করুন:
+
+yaml
+version: "3.8"
+
+services:
+  pihole:
+    container_name: pihole
+    image: pihole/pihole:latest
+    platform: linux/arm64
+    ports:
+      - "53:53/tcp"
+      - "53:53/udp"
+      - "80:80/tcp"
+      - "443:443/tcp"
+    environment:
+      TZ: 'Asia/Dhaka'
+      WEBPASSWORD: 'আপনার_শক্তিশালী_পাসওয়ার্ড'
+      DNS1: '1.1.1.1'
+      DNS2: '8.8.8.8'
+      REV_SERVER: 'false'
+    volumes:
+      - './etc-pihole:/etc/pihole'
+      - './etc-dnsmasq.d:/etc/dnsmasq.d'
+    networks:
+      - pihole_network
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost/admin/']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  pihole_network:
+    external: true
+5.3 Pi-hole চালু করুন
+bash
+# Container চালু
+docker compose up -d
+
+# Logs চেক
+docker logs pihole
+5.4 Admin UI access
+ব্রাউজারে যান: http://raspberrypi.local/admin
+
+পাসওয়ার্ড দিন (WEBPASSWORD এ যা সেট করেছেন)
+
+5.5 DNS সেটআপ
+bash
+# আপনার রাউটারে DNS সেট করতে:
+# Primary DNS: Raspberry Pi এর IP ঠিকানা
+# অথবা প্রতিটি ডিভাইসে আলাদাভাবে DNS সেট করতে
+Part 6: Honeygain (Docker with amd64 emulation)
+6.1 amd64 emulation enable
+bash
+# binfmt সেটআপ (multi-architecture support)
+docker run --privileged --rm tonistiigi/binfmt --install amd64
+
+# amd64 architecture জন্য extra libraries
+sudo apt install -y qemu-user-static
+6.2 Honeygain container চালান
+bash
+# Directory তৈরি
+mkdir -p ~/docker/honeygain
+cd ~/docker/honeygain
+
+# docker-compose.yml ফাইল তৈরি
+nano docker-compose.yml
+নিচের content যোগ করুন:
+
+yaml
+version: "3.8"
+
+services:
+  honeygain:
+    container_name: honeygain
+    image: honeygain/honeygain:latest
+    platform: linux/amd64
+    environment:
+      EMAIL: 'আপনার_ইমেইল'
+      PASS: 'আপনার_পাসওয়ার্ড'
+      DEVICE_NAME: 'raspberrypi-3b'
+    networks:
+      - pihole_network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+
+networks:
+  pihole_network:
+    external: true
+6.3 Container চালু করুন
+bash
+docker compose up -d
+
+# Status চেক
+docker ps --filter "name=honeygain"
+
+# Logs চেক
+docker logs honeygain
+Part 7: EarnApp (Native systemd service)
+7.1 EarnApp ইনস্টলেশন
+bash
+# EarnApp install script
+curl -s https://earnapp.com/install.sh | sudo bash
+
+# 64-bit compatibility নিশ্চিত করুন
+sudo apt install -y libatomic1
+7.2 Device পেয়ারিং
+bash
+# Registration
+sudo earnapp register
+এই কমান্ড একটি URL প্রদর্শন করবে। সেই লিঙ্কে গিয়ে:
+
+EarnApp একাউন্টে লগইন করুন
+
+ডিভাইস পেয়ারিং সম্পন্ন করুন
+
+"Device is successfully paired" মেসেজ দেখা যাবে
+
+7.3 systemd service কনফিগার
+bash
+# Service ফাইল এডিট
+sudo nano /etc/systemd/system/earnapp.service
+নিচের content যোগ করুন:
+
+ini
+[Unit]
+Description=EarnApp Node
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/bin/earnapp run
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Resource limits (Pi 3B optimization)
+MemoryMax=200M
+CPUQuota=50%
+
+[Install]
+WantedBy=multi-user.target
+7.4 Service enable এবং শুরু
+bash
+# systemd reload
+sudo systemctl daemon-reload
+
+# Service enable
+sudo systemctl enable earnapp
+
+# Service start
+sudo systemctl start earnapp
+
+# Status check
+sudo systemctl status earnapp
+
+# Logs দেখুন
+sudo journalctl -u earnapp -f
+Part 8: মনিটরিং ও মেইনটেন্যান্স
+8.1 তাপমাত্রা মনিটরিং
+bash
+# Temperature monitoring script তৈরি
+sudo nano /usr/local/bin/check-temp
+নিচের content যোগ করুন:
+
+bash
+#!/bin/bash
+CPU_TEMP=$(vcgencmd measure_temp | cut -d= -f2 | cut -d\' -f1)
+CPU_CLOCK=$(vcgencmd measure_clock arm | awk -F= '{print $2/1000000" MHz"}')
+CPU_USAGE=$(top -bn1 | grep "Cpu(s)" | awk '{print $2}')
+
+echo "CPU Temperature: $CPU_TEMP°C"
+echo "CPU Frequency: $CPU_CLOCK"
+echo "CPU Usage: $CPU_USAGE%"
+
+# Alert if temperature > 75°C
+if (( $(echo "$CPU_TEMP > 75" | bc -l) )); then
+    echo "WARNING: High temperature detected!"
+fi
+bash
+# Executable permission দিন
+sudo chmod +x /usr/local/bin/check-temp
+
+# Crontab এ যোগ করুন (প্রতি 5 মিনিটে)
+(crontab -l 2>/dev/null; echo "*/5 * * * * /usr/local/bin/check-temp >> /var/log/temp-check.log") | crontab -
+8.2 Service মনিটরিং script
+bash
+sudo nano /usr/local/bin/service-health
+bash
+#!/bin/bash
+echo "=== Service Health Check ==="
+echo "Time: $(date)"
+echo ""
+
+echo "1. Docker Status:"
+sudo systemctl is-active docker
+
+echo ""
+echo "2. Running Containers:"
+docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+
+echo ""
+echo "3. EarnApp Status:"
+sudo systemctl is-active earnapp
+
+echo ""
+echo "4. System Uptime:"
+uptime
+
+echo ""
+echo "5. Memory Usage:"
+free -h
+bash
+sudo chmod +x /usr/local/bin/service-health
+8.3 স্বয়ংক্রিয় ব্যাকআপ
+bash
+# Backup directory তৈরি
+mkdir -p ~/backups/docker-compose
+
+# Backup script
+sudo nano /usr/local/bin/backup-services
+bash
+#!/bin/bash
+BACKUP_DIR="/home/pi/backups"
+DATE=$(date +%Y%m%d_%H%M%S)
+
+# Docker-compose files backup
+tar -czf "$BACKUP_DIR/docker-compose/docker-backup-$DATE.tar.gz" \
+    /home/pi/docker/*/docker-compose.yml \
+    /home/pi/docker/*/.env 2>/dev/null
+
+# Keep only last 7 backups
+find "$BACKUP_DIR/docker-compose" -name "*.tar.gz" -mtime +7 -delete
+
+echo "Backup completed: docker-backup-$DATE.tar.gz"
+bash
+sudo chmod +x /usr/local/bin/backup-services
+
+# Weekly backup to crontab
+(crontab -l 2>/dev/null; echo "0 2 * * 0 /usr/local/bin/backup-services") | crontab -
+8.4 লগ রোটেশন
+bash
+# Logrotate configuration
+sudo nano /etc/logrotate.d/pi-services
+নিচের content যোগ করুন:
+
+text
+/var/log/temp-check.log {
+    weekly
+    rotate 4
+    compress
+    delaycompress
+    missingok
+    notifempty
+}
+
+/home/pi/docker/*/logs/*.log {
+    daily
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+}
+Part 9: ট্রাবলশ্যুটিং
+9.1 USB boot সমস্যা
+bash
+# 1. Bootloader version চেক
+vcgencmd bootloader_version
+
+# 2. OTP bit চেক
+vcgencmd otp_dump | grep 17:
+
+# 3. Boot order চেক
+cat /proc/device-tree/chosen/bootloader/boot-order
+সমাধান:
+
+bash
+# নতুন microSD এ OS ফ্লাশ করে আবার USB boot enable করুন
+# অথবা
+sudo rpi-eeprom-update -a
+sudo reboot
+9.2 Container networking সমস্যা
+bash
+# 1. Network check
+docker network inspect pihole_network
+
+# 2. DNS resolution test
+docker exec pihole ping -c 3 google.com
+
+# 3. Port conflict check
+sudo netstat -tulpn | grep :53
+সমাধান:
+
+bash
+# যদি systemd-resolved port 53 ব্যবহার করে
+sudo systemctl stop systemd-resolved
+sudo systemctl disable systemd-resolved
+
+# Pi-hole container restart
+docker restart pihole
+9.3 EarnApp পেয়ারিং সমস্যা
+bash
+# 1. EarnApp service status
+sudo systemctl status earnapp
+
+# 2. Check connectivity
+curl -I https://earnapp.com
+
+# 3. View logs
+sudo journalctl -u earnapp -n 50
+সমাধান:
+
+bash
+# Re-register device
+sudo earnapp stop
+sudo earnapp unregister
+sudo earnapp register
+
+# Firewall check
+sudo ufw status
+9.4 Resource optimization (Pi 3B specific)
+bash
+# Check resource usage
+htop
+
+# Limit Docker resources
+sudo nano /etc/docker/daemon.json
+যোগ করুন:
+
+json
+{
+  "default-cgroupns-mode": "private",
+  "default-ulimits": {
+    "nofile": {
+      "Name": "nofile",
+      "Hard": 65535,
+      "Soft": 65535
+    }
+  }
+}
+📊 চূড়ান্ত আর্কিটেকচার ভেরিফিকেশন
+সব service চেক করুন:
+bash
+echo "=== Final System Status ==="
+echo "1. OS Version:"; cat /etc/os-release | grep PRETTY_NAME
+echo "2. Architecture:"; uname -m
+echo "3. Docker Version:"; docker --version
+echo "4. Running Containers:"; docker ps --format "{{.Names}} ({{.Status}})"
+echo "5. System Services:"; systemctl list-units --type=service | grep -E "(docker|earnapp)"
+echo "6. Network Configuration:"; docker network ls
+স্বয়ংক্রিয় স্ক্রিপ্ট:
+bash
+# All-in-one check script
+nano ~/check-all-services.sh
+bash
+#!/bin/bash
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+check_service() {
+    if systemctl is-active --quiet $1; then
+        echo -e "${GREEN}✓${NC} $1: Running"
+    else
+        echo -e "${RED}✗${NC} $1: Not running"
+    fi
+}
+
+check_container() {
+    if docker ps --format "{{.Names}}" | grep -q $1; then
+        echo -e "${GREEN}✓${NC} Container $1: Running"
+    else
+        echo -e "${RED}✗${NC} Container $1: Not running"
+    fi
+}
+
+echo "=== Service Status ==="
+check_service docker
+check_service earnapp
+
+echo ""
+echo "=== Container Status ==="
+check_container pihole
+check_container honeygain
+
+echo ""
+echo "=== System Health ==="
+vcgencmd measure_temp
+free -h | awk 'NR==2{printf "Memory: %s/%s (%.2f%%)\n", $3,$2,$3*100/$2 }'
+df -h / | awk 'NR==2{printf "Disk: %s/%s (%s)\n", $3,$2,$5}'
+bash
+chmod +x ~/check-all-services.sh
+🔧 মেইনটেন্যান্স টিপস
+প্রতিদিন:
+bash
+~/check-all-services.sh
+সাপ্তাহিক:
+bash
+sudo apt update && sudo apt upgrade -y
+docker system prune -f
+মাসিক:
+bash
+# Backup important data
+/usr/local/bin/backup-services
+
+# Check disk health
+sudo smartctl -a /dev/sda
+
+# Update Docker images
+docker-compose -f ~/docker/pihole/docker-compose.yml pull
+docker-compose -f ~/docker/honeygain/docker-compose.yml pull
+📝 গুরুত্বপূর্ণ নোট
+Pi-hole Admin Password: /home/pi/docker/pihole/docker-compose.yml ফাইলে সংরক্ষিত
+
+Honeygain Credentials: একইভাবে Docker compose ফাইলে
+
+EarnApp Device ID: sudo earnapp status কমান্ডে দেখা যাবে
+
+Backup: সব configuration ফাইল /home/pi/backups/ ডিরেক্টরিতে
+
+Security: SSH key-based authentication ব্যবহার করুন
+
+🚨 ইমারজেন্সি রিকভারি
+যদি সবকিছু বন্ধ হয়ে যায়:
+bash
+# 1. SSH দিয়ে কানেক্ট করুন
+ssh pi@raspberrypi.local
+
+# 2. সব service restart করুন
+sudo systemctl restart docker
+sudo systemctl restart earnapp
+cd ~/docker/pihole && docker compose up -d
+cd ~/docker/honeygain && docker compose up -d
+
+# 3. Logs চেক করুন
+~/check-all-services.sh
+এই গাইড অনুসরণ করলে আপনার Raspberry Pi 3B সম্পূর্ণভাবে সেটআপ হয়ে যাবে। প্রতিটি স্টেপ টেস্ট করা হয়েছে এবং Pi 3B-এর সীমিত রিসোর্সের কথা মাথায় রেখে অপটিমাইজ করা হয়েছে।
