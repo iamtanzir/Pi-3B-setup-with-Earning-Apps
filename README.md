@@ -32,6 +32,42 @@ Everything is 64-bit compatible, resource-optimized for the Pi 3B's limited RAM 
 
 ---
 
+## 🚀 Quick Deploy (copy-paste)
+
+After completing Parts 1–4 (USB boot + SSD + base OS + Docker), you can deploy everything with one script:
+
+```bash
+git clone https://github.com/iamtanzir/Pi-3B-setup-with-Earning-Apps.git
+cd Pi-3B-setup-with-Earning-Apps
+cp .env.example .env
+nano .env                     # fill in PIHOLE_PASSWORD, HONEYGAIN_EMAIL, HONEYGAIN_PASS, DEVICE_NAME
+bash scripts/setup.sh                 # Pi-hole + Honeygain
+bash scripts/setup.sh --with-earnapp  # + EarnApp (interactive installer)
+```
+
+The script updates the OS, installs Docker, enables amd64 emulation, writes both compose files and starts both containers. It asks you to confirm the Honeygain legitimacy checklist first (see below). **`.env` is gitignored — never commit real credentials.**
+
+---
+
+## 🛡️ Why Honeygain blocks IPs — and the honest fix
+
+Honeygain's anti-fraud system blocks IPs/accounts that look abusive. **No script can or should "beat" it** — this repo contains no anti-cheat bypass, and neither should yours. The real reasons for bans, and the fixes:
+
+| Cause of block | ToS-compliant fix |
+|---|---|
+| VPN / proxy / Tor / data-center or VPS IP | Run on your **genuine residential connection** only |
+| Multiple accounts on one IP | One account, one household, one IP |
+| Duplicate `-device` name on several containers | Use a unique `DEVICE_NAME` per device (set in `.env`) |
+| Restarting/recreating the container constantly (looks like churn/farming) | Let it run stably 24/7 with `restart: unless-stopped` |
+| Emulators/VMs designed to spoof humans | Run on the real Pi 3B, not nested VMs |
+| Outdated client / modified app | Always pull `honeygain/honeygain:latest` |
+
+If your IP is **already** blocked: stop the containers, wait out the block (or contact Honeygain support), remove any VPN/proxy on the router, and reconnect on a clean residential IP with a fresh device name. Attempting to hide the block behind another identity violates their ToS and risks a permanent account ban.
+
+**The bottom line:** the Pi 3B setup in this repo — real hardware, residential IP, one account, unique device name — is the legitimate way to earn. That is the only unblockable configuration.
+
+---
+
 ## 🏗️ Final Architecture
 
 ```
