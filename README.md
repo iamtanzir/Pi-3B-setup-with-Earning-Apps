@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/banner.svg" alt="Pi-3B Setup with Earning Apps — Pi-hole, Honeygain and EarnApp on Raspberry Pi 3B" width="100%">
+  <img src="assets/banner.png" alt="Pi-3B Setup with Earning Apps — Pi-hole, Honeygain and EarnApp on Raspberry Pi 3B" width="100%">
 </p>
 
 <h1 align="center">Pi-3B Setup with Earning Apps</h1>
